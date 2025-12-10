@@ -7,7 +7,6 @@
     };
   in
     import nixpkgs {overlays = [];},
-  pre-commit-check ? import (builtins.fetchTarball "https://github.com/cachix/git-hooks.nix/tarball/master"),
   ...
 }:
 pkgs.stdenv.mkDerivation {
@@ -40,14 +39,8 @@ pkgs.stdenv.mkDerivation {
     alejandra
   ];
 
-  # Runtime dependencies
-  buildInputs = pre-commit-check.enabledPackages;
-
   # Bootstrapping commands
   shellHook = ''
-    # Initiate git hooks
-    ${pre-commit-check.shellHook}
-
     # Fetch latest changes
     git pull
   '';

@@ -2,86 +2,64 @@
   description = "Sygnal nixi-flaked for Uchar.";
 
   inputs = {
-    # Nixpkgs latest
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Nixpkgs for vanilla way
+    nixpkgs-v.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    # Nixpkgs for poetry version
+    # https://github.com/nix-community/poetry2nix/blob/ce2369db77f45688172384bbeb962bc6c2ea6f94/templates/app/flake.nix#L6
+    nixpkgs-p.url = "github:NixOS/nixpkgs?rev=75e28c029ef2605f9841e0baa335d70065fe7ae2";
 
     # Flake utils, generators
     flake-utils.url = "github:numtide/flake-utils";
 
     # Poetry to Nix
-    poetry2nix = {
-      url = "github:nix-community/poetry2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "flake-utils";
-    };
-
-    # Pre commit hooks for git
-    pre-commit-hooks = {
-      url = "github:cachix/git-hooks.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    poetry2nix.url = "github:nix-community/poetry2nix";
   };
 
-  outputs = inputs @ {
+  outputs = {
     self,
-    nixpkgs,
+    nixpkgs-v,
+    nixpkgs-p,
     flake-utils,
     poetry2nix,
-    pre-commit-hooks,
     ...
   }:
   # Per system
     flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {
+      pkgs-v = import nixpkgs-v {
         inherit system;
-        overlays = [poetry2nix.overlays.default];
+        overlays = [
+          # Required python deps
+          (import ./overlay.nix)
+        ];
+      };
+
+      pkgs-p = import nixpkgs-p {
+        inherit system;
+        overlays = [
+          # Required python deps
+          poetry2nix.overlays.default
+        ];
       };
     in {
       # Formatter for your nix files, available through 'nix fmt'
-      formatter = pkgs.alejandra;
+      formatter = pkgs-v.alejandra;
 
       # Development shells
       devShells = {
         default = import ./shell.nix {
-          inherit pkgs;
+          pkgs = pkgs-v;
           inherit (self.checks.${system}) pre-commit-check;
         };
       };
 
       # Packages
       packages = rec {
-        default = server;
-        server = pkgs.callPackage ./. {inherit pkgs;};
-      };
-
-      # Checks for hooks
-      checks = {
-        pre-commit-check = pre-commit-hooks.lib.${system}.run {
-          src = ./.;
-          hooks = {
-            statix = let
-              pkgs = inputs.nixpkgs.legacyPackages.${system};
-            in {
-              enable = true;
-              package =
-                pkgs.statix.overrideAttrs
-                (_o: rec {
-                  src = pkgs.fetchFromGitHub {
-                    owner = "oppiliappan";
-                    repo = "statix";
-                    rev = "e9df54ce918457f151d2e71993edeca1a7af0132";
-                    hash = "sha256-duH6Il124g+CdYX+HCqOGnpJxyxOCgWYcrcK0CBnA2M=";
-                  };
-
-                  cargoDeps = pkgs.rustPlatform.importCargoLock {
-                    lockFile = src + "/Cargo.lock";
-                    allowBuiltinFetchGit = true;
-                  };
-                });
-            };
-            alejandra.enable = true;
-            # flake-checker.enable = true;
-          };
+        default = poetry;
+        vanilla = pkgs-v.callPackage ./pkgs/vanilla.nix {pkgs = pkgs-v;};
+        poetry = pkgs-p.callPackage ./pkgs/poetry.nix {
+          inherit self;
+          pkgs = pkgs-p;
         };
       };
     })
