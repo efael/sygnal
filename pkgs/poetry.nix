@@ -21,7 +21,7 @@ in
     # UPDATE:
     # ok...
     # evaluation warning: Unknown ruff version: '0.0.291'. Please update getCargoHash.
-    # then what the actual fuck is this
+    # then what the actual fuck is this:
     # https://github.com/nix-community/poetry2nix/blob/ce2369db77f45688172384bbeb962bc6c2ea6f94/overrides/default.nix#L3440C1-L3440C72
     overrides = poetry2nix.overrides.withDefaults (
       final: prev: {
