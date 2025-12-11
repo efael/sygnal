@@ -42,7 +42,7 @@ pkgs.stdenv.mkDerivation {
   # Bootstrapping commands
   shellHook = ''
     # Fetch latest changes
-    git pull
+    # git pull
   '';
 
   # Nix related configurations

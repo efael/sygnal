@@ -1,6 +1,43 @@
 {pkgs, ...}: let
   # Library instance
   inherit (pkgs) poetry2nix;
+  pypkgs-build-requirements = {
+    types-opentracing = ["setuptools"];
+    google-auth-stubs = ["poetry-core" "setuptools"];
+    grpc-stubs = ["setuptools"];
+  };
+  p2n-overrides = poetry2nix.defaultPoetryOverrides.extend (final: prev:
+    (builtins.mapAttrs (
+        package: build-requirements:
+          (builtins.getAttr package prev).overridePythonAttrs (old: {
+            buildInputs =
+              (old.buildInputs or [])
+              ++ (builtins.map (pkg:
+                if builtins.isString pkg
+                then builtins.getAttr pkg prev
+                else pkg)
+              build-requirements);
+          })
+      )
+      pypkgs-build-requirements)
+    // {
+      ruff =
+        prev.ruff.overridePythonAttrs
+        (
+          old: {
+            postPatch = ''
+              substituteInPlace crates/ruff_python_ast/src/nodes.rs \
+                --replace-fail 'assert_eq_size!(Pattern, [u8; 96]);' '// removed'
+            '';
+            cargoDeps = pkgs.rustPlatform.importCargoLock {
+              lockFile = ./Cargo.ruff.lock;
+              outputHashes = {
+                "unicode_names2-0.6.0" = "sha256-eWg9+ISm/vztB0KIdjhq5il2ZnwGJQCleCYfznCI3Wg=";
+              };
+            };
+          }
+        );
+    });
 in
   poetry2nix.mkPoetryApplication rec {
     pname = "sygnal";
@@ -15,21 +52,7 @@ in
       sha256 = "sha256-3edws4rGMBRy5fMbV1pjz3e7WaSvaTcn2RkJbGTz3P4=";
     };
 
-    # Helpless, gotta fork the whole p2n and add value to getCargoHash.
-    # https://github.com/nix-community/poetry2nix/blob/ce2369db77f45688172384bbeb962bc6c2ea6f94/overrides/default.nix#L3466
-    # ---
-    # UPDATE:
-    # ok...
-    # evaluation warning: Unknown ruff version: '0.0.291'. Please update getCargoHash.
-    # then what the actual fuck is this:
-    # https://github.com/nix-community/poetry2nix/blob/ce2369db77f45688172384bbeb962bc6c2ea6f94/overrides/default.nix#L3440C1-L3440C72
-    overrides = poetry2nix.overrides.withDefaults (
-      final: prev: {
-        ruff = prev.ruff.overridePythonAttrs (
-          old: {
-            cargoLock.outputHashes."unicode_names2-0.6.0" = "hash";
-          }
-        );
-      }
-    );
+    overrides = p2n-overrides;
+
+    meta.mainProgram = "sygnal";
   }
