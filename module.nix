@@ -45,6 +45,7 @@ in {
       home = cfg.dataDir;
       createHome = true;
       shell = "${pkgs.bash}/bin/bash";
+      isSystemUser = true;
     };
 
     users.groups.matrix-sygnal = {};
