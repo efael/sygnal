@@ -54,5 +54,8 @@ in
 
     overrides = p2n-overrides;
 
-    meta.mainProgram = "sygnal";
+    meta = {
+      mainProgram = "sygnal";
+      platforms = with pkgs.lib.platforms; linux ++ darwin;
+    };
   }
